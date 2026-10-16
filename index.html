@@ -1,0 +1,1039 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Shogi</title>
+
+<style>
+*{box-sizing:border-box}
+html,body{min-height:100%}
+
+body{
+  margin:0;
+  background:#202124;
+  color:white;
+  font-family:Arial,sans-serif;
+  text-align:center;
+  overflow-x:hidden
+}
+
+h1{
+  margin:8px;
+  font-size:clamp(22px,3vw,34px)
+}
+
+.game-layout{
+  width:min(98vw,1250px);
+  min-height:calc(100vh - 20px);
+  margin:auto;
+  padding:8px;
+  display:grid;
+  grid-template-columns:minmax(150px,220px) minmax(300px,1fr) minmax(170px,250px);
+  gap:clamp(8px,2vw,24px);
+  align-items:center
+}
+
+.left-panel{
+  min-height:min(90vh,700px);
+  display:flex;
+  flex-direction:column;
+  justify-content:space-between;
+  gap:12px
+}
+
+.board-area{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  min-width:0
+}
+
+#board{
+  width:min(68vw,72vh,700px);
+  aspect-ratio:1;
+  margin:auto;
+  display:grid;
+  grid-template-columns:repeat(9,minmax(0,1fr));
+  grid-template-rows:repeat(9,minmax(0,1fr));
+  border:4px solid #754c24;
+  transition:transform .35s ease
+}
+
+.cell{
+  width:100%;
+  height:100%;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background:#e6b96e;
+  border:1px solid #754c24;
+  cursor:pointer;
+  overflow:hidden
+}
+
+.cell:hover{background:#f4cf87}
+.selected{background:#ffe066!important}
+.legal{background:#9be564!important}
+
+.piece{
+  font-size:clamp(20px,5vw,43px);
+  line-height:1;
+  font-weight:bold;
+  color:#111;
+  font-family:serif;
+  transform:rotate(180deg);
+  user-select:none
+}
+
+.player{transform:none}
+.promoted{color:#c1121f}
+
+.incheck{
+  background:red;
+  border-radius:50%;
+  box-shadow:0 0 20px 9px red;
+  animation:glow .8s infinite alternate
+}
+
+@keyframes glow{
+  to{box-shadow:0 0 30px 14px red}
+}
+
+.hand{
+  background:#303134;
+  padding:10px;
+  border-radius:8px;
+  width:100%
+}
+
+.hand h3{
+  margin:4px 0 10px;
+  font-size:clamp(14px,1.5vw,19px)
+}
+
+.hand-piece{
+  display:inline-block;
+  background:#444;
+  padding:8px;
+  margin:3px;
+  border-radius:5px;
+  cursor:pointer
+}
+
+.hand-piece:hover,
+.hand-piece.selected{background:#5865f2}
+
+.hand-piece.disabled{
+  cursor:default;
+  opacity:.55
+}
+
+.player1-hand{border:2px solid #278dcc}
+.player2-hand{border:2px solid #c96637}
+
+.new-game-button{
+  width:100%;
+  padding:11px;
+  margin:0
+}
+
+.right-panel{
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  gap:18px
+}
+
+.controls{
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+  background:#303134;
+  padding:12px;
+  border-radius:8px
+}
+
+select,button{
+  padding:8px;
+  margin:2px;
+  border:0;
+  border-radius:5px
+}
+
+button{
+  background:#5865f2;
+  color:white;
+  cursor:pointer
+}
+
+button:hover{background:#4752c4}
+
+#status{
+  min-height:70px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:12px;
+  border-radius:8px;
+  background:#303134;
+  color:#ffd166;
+  font-size:clamp(16px,2vw,23px);
+  font-weight:bold
+}
+
+#status.player1-turn{
+  background:#174f75;
+  color:#8ed8ff
+}
+
+#status.player2-turn{
+  background:#713b22;
+  color:#ffbd8a
+}
+
+#status.bot-turn{
+  background:#4c3b78;
+  color:#d5c2ff
+}
+
+#status.check-status{
+  background:#8f2020;
+  color:white;
+  animation:pulse .8s infinite alternate
+}
+
+@keyframes pulse{
+  to{box-shadow:0 0 18px #f44}
+}
+
+.modal{
+  position:fixed;
+  inset:0;
+  background:#000b;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  z-index:10
+}
+
+.hidden{display:none!important}
+
+.modalbox{
+  background:linear-gradient(#444,#222);
+  padding:35px;
+  border-radius:12px;
+  box-shadow:0 8px 40px #000;
+  min-width:260px
+}
+
+.modalbox h2{color:#ffd166}
+
+@media(max-width:800px){
+  .game-layout{
+    grid-template-columns:145px minmax(260px,1fr);
+    grid-template-areas:
+      "left board"
+      "right board"
+  }
+
+  .left-panel{grid-area:left;min-height:0}
+  .board-area{grid-area:board}
+  .right-panel{grid-area:right}
+  #board{width:min(65vw,70vh)}
+}
+
+@media(max-width:560px){
+  .game-layout{
+    width:98vw;
+    display:flex;
+    flex-direction:column;
+    gap:8px
+  }
+
+  .board-area{order:1;width:100%}
+  #board{width:min(94vw,94vh)}
+  .right-panel{order:2;width:100%}
+
+  .left-panel{
+    order:3;
+    width:100%;
+    min-height:0;
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    grid-template-areas:
+      "player2 player1"
+      "newgame newgame"
+  }
+
+  .player2-hand{grid-area:player2}
+  .player1-hand{grid-area:player1}
+  .new-game-button{grid-area:newgame}
+  .hand{padding:6px}
+  .hand-piece{padding:6px;margin:2px}
+}
+</style>
+</head>
+
+<body>
+
+<div class="game-layout">
+  <div class="left-panel">
+    <div class="hand player2-hand">
+      <h3 id="player2Title">Player 2 / Bot</h3>
+      <div id="bhand"></div>
+    </div>
+
+    <button class="new-game-button" onclick="newGame()">New Game</button>
+
+    <div class="hand player1-hand">
+      <h3 id="player1Title">Player 1 / You</h3>
+      <div id="phand"></div>
+    </div>
+  </div>
+
+  <main class="board-area">
+    <h1>Shogi</h1>
+    <div id="board"></div>
+  </main>
+
+  <aside class="right-panel">
+    <div class="controls">
+      <label>Mode:</label>
+
+      <select id="mode" onchange="newGame()">
+        <option value="bot">Play vs Bot</option>
+        <option value="local">Local Multiplayer</option>
+      </select>
+
+      <span id="difficultyControl">
+        <label>Difficulty:</label>
+
+        <select id="difficulty">
+          <option value="easy">Easy</option>
+          <option value="medium">Medium</option>
+          <option value="hard">Hard</option>
+          <option value="expert">Expert</option>
+          <option value="master">Master</option>
+        </select>
+      </span>
+    </div>
+
+    <div id="status">Your turn</div>
+  </aside>
+</div>
+
+<div id="modal" class="modal hidden">
+  <div class="modalbox">
+    <h2 id="winner"></h2>
+    <p id="reason"></p>
+    <button onclick="newGame()">New Game</button>
+  </div>
+</div>
+
+<script>
+const S={
+  K:"玉",R:"飛",B:"角",G:"金",S:"銀",N:"桂",L:"香",P:"歩"
+};
+
+const order=["R","B","G","S","N","L","P"];
+
+const pieceValues={
+  K:10000,
+  R:900,
+  B:850,
+  G:500,
+  S:400,
+  N:300,
+  L:250,
+  P:100
+};
+
+let b,h,turn,sel,over;
+let boardAngle=0;
+let boardFacing="player1";
+
+function pc(type,side,promoted=false){
+  return{type,side,promoted};
+}
+
+function mode(){
+  return document.getElementById("mode").value;
+}
+
+function difficulty(){
+  return document.getElementById("difficulty").value;
+}
+
+function updateInterface(){
+  const local=mode()==="local";
+
+  document
+    .getElementById("difficultyControl")
+    .classList.toggle("hidden",local);
+
+  document.getElementById("player1Title").textContent=
+    local?"Player 1":"Player 1 / You";
+
+  document.getElementById("player2Title").textContent=
+    local?"Player 2":"Player 2 / Bot";
+
+  const newFacing=
+    local&&turn==="bot"
+      ?"player2"
+      :"player1";
+
+  if(newFacing!==boardFacing){
+    boardAngle+=180;
+    boardFacing=newFacing;
+  }
+
+  document.getElementById("board").style.transform=
+    `rotate(${boardAngle}deg)`;
+}
+
+function newGame(){
+  b=Array.from({length:9},()=>Array(9).fill(null));
+
+  const back=["L","N","S","G","K","G","S","N","L"];
+
+  for(let x=0;x<9;x++){
+    b[0][x]=pc(back[x],"bot");
+    b[2][x]=pc("P","bot");
+    b[6][x]=pc("P","player");
+    b[8][x]=pc(back[x],"player");
+  }
+
+  b[1][1]=pc("R","bot");
+  b[1][7]=pc("B","bot");
+  b[7][1]=pc("B","player");
+  b[7][7]=pc("R","player");
+
+  h={
+    player:{R:0,B:0,G:0,S:0,N:0,L:0,P:0},
+    bot:{R:0,B:0,G:0,S:0,N:0,L:0,P:0}
+  };
+
+  turn="player";
+  sel=null;
+  over=false;
+  boardAngle=0;
+  boardFacing="player1";
+
+  document.getElementById("modal").classList.add("hidden");
+
+  draw();
+  status();
+}
+
+function status(message){
+  const el=document.getElementById("status");
+  el.className="";
+
+  if(message){
+    el.textContent=message;
+    el.classList.add("check-status");
+    return;
+  }
+
+  if(check(turn)){
+    el.classList.add("check-status");
+
+    el.textContent=turn==="player"
+      ?mode()==="local"
+        ?"⚠️ Player 1 is in check!"
+        :"⚠️ Your king is in check!"
+      :mode()==="local"
+        ?"⚠️ Player 2 is in check!"
+        :"⚠️ The bot is in check!";
+
+    return;
+  }
+
+  if(turn==="player"){
+    el.textContent=mode()==="local"
+      ?"🔵 PLAYER 1'S TURN"
+      :"🔵 YOUR TURN";
+
+    el.classList.add("player1-turn");
+  }else{
+    el.textContent=mode()==="local"
+      ?"🟠 PLAYER 2'S TURN"
+      :"🟣 BOT'S TURN";
+
+    el.classList.add(
+      mode()==="local"
+        ?"player2-turn"
+        :"bot-turn"
+    );
+  }
+}
+
+function zone(side,y){
+  return side==="player"?y<=2:y>=6;
+}
+
+function prom(type){
+  return{
+    R:"龍",B:"馬",S:"全",N:"圭",L:"杏",P:"と"
+  }[type]||S[type];
+}
+
+function draw(){
+  updateInterface();
+
+  const board=document.getElementById("board");
+  board.innerHTML="";
+
+  for(let y=0;y<9;y++){
+    for(let x=0;x<9;x++){
+      const cell=document.createElement("div");
+      cell.className="cell";
+
+      if(sel&&sel.kind==="b"&&sel.x===x&&sel.y===y)
+        cell.classList.add("selected");
+
+      if(sel&&target(x,y))
+        cell.classList.add("legal");
+
+      const piece=b[y][x];
+
+      if(piece){
+        const symbol=document.createElement("span");
+        symbol.className="piece";
+
+        if(piece.side==="player")
+          symbol.classList.add("player");
+
+        if(piece.promoted)
+          symbol.classList.add("promoted");
+
+        const kp=king(piece.side);
+
+        if(piece.type==="K"&&kp&&check(piece.side))
+          symbol.classList.add("incheck");
+
+        symbol.textContent=piece.promoted
+          ?prom(piece.type)
+          :S[piece.type];
+
+        cell.appendChild(symbol);
+      }
+
+      cell.onclick=()=>click(x,y);
+      board.appendChild(cell);
+    }
+  }
+
+  hand("player","phand");
+  hand("bot","bhand");
+}
+
+function hand(side,id){
+  const container=document.getElementById(id);
+  container.innerHTML="";
+
+  let empty=true;
+
+  for(const type of order){
+    if(!h[side][type])continue;
+
+    empty=false;
+
+    const piece=document.createElement("span");
+    piece.className="hand-piece";
+    piece.textContent=S[type]+" ×"+h[side][type];
+
+    const allowed=
+      !over&&
+      turn===side&&
+      (mode()==="local"||side==="player");
+
+    if(sel&&sel.kind==="h"&&sel.side===side&&sel.type===type)
+      piece.classList.add("selected");
+
+    if(allowed){
+      piece.onclick=()=>{
+        sel={kind:"h",side,type};
+        draw();
+      };
+    }else{
+      piece.classList.add("disabled");
+    }
+
+    container.appendChild(piece);
+  }
+
+  if(empty)container.textContent="None";
+}
+
+function click(x,y){
+  if(over)return;
+  if(mode()==="bot"&&turn==="bot")return;
+
+  if(
+    sel&&sel.kind==="h"&&
+    (sel.side!==turn||(mode()==="bot"&&sel.side!=="player"))
+  ){
+    sel=null;
+    draw();
+    return;
+  }
+
+  if(sel&&target(x,y)){
+    move(sel,x,y);
+    return;
+  }
+
+  if(b[y][x]&&b[y][x].side===turn){
+    sel={kind:"b",x,y,side:turn};
+  }else{
+    sel=null;
+  }
+
+  draw();
+}
+
+function target(x,y){
+  if(!sel)return false;
+
+  if(sel.kind==="h")
+    return !b[y][x]&&drop(sel.type,x,y,sel.side);
+
+  const piece=b[sel.y][sel.x];
+
+  return piece&&
+    b[y][x]?.side!==piece.side&&
+    can(piece,sel.x,sel.y,x,y);
+}
+
+function path(x1,y1,x2,y2){
+  const sx=Math.sign(x2-x1);
+  const sy=Math.sign(y2-y1);
+
+  let x=x1+sx;
+  let y=y1+sy;
+
+  while(x!==x2||y!==y2){
+    if(b[y][x])return false;
+    x+=sx;
+    y+=sy;
+  }
+
+  return true;
+}
+
+function can(piece,x1,y1,x2,y2){
+  const dx=x2-x1;
+  const dy=y2-y1;
+  const d=piece.side==="player"?-1:1;
+
+  if(piece.type==="K")
+    return Math.abs(dx)<=1&&Math.abs(dy)<=1;
+
+  if(
+    piece.type==="G"||
+    (piece.promoted&&["S","N","L","P"].includes(piece.type))
+  ){
+    return(
+      (dy===d&&Math.abs(dx)<=1)||
+      (dy===0&&Math.abs(dx)===1)||
+      (dy===-d&&dx===0)
+    );
+  }
+
+  if(piece.type==="S")
+    return(
+      (dy===d&&Math.abs(dx)<=1)||
+      (dy===-d&&Math.abs(dx)===1)
+    );
+
+  if(piece.type==="P")
+    return dx===0&&dy===d;
+
+  if(piece.type==="N")
+    return dy===2*d&&Math.abs(dx)===1;
+
+  if(piece.type==="L")
+    return dx===0&&dy*d>0&&path(x1,y1,x2,y2);
+
+  if(piece.type==="R")
+    return(
+      ((dx===0||dy===0)&&path(x1,y1,x2,y2))||
+      (piece.promoted&&Math.abs(dx)===1&&Math.abs(dy)===1)
+    );
+
+  if(piece.type==="B")
+    return(
+      (Math.abs(dx)===Math.abs(dy)&&dx!==0&&path(x1,y1,x2,y2))||
+      (piece.promoted&&(
+        (Math.abs(dx)===1&&dy===0)||
+        (Math.abs(dy)===1&&dx===0)
+      ))
+    );
+
+  return false;
+}
+
+function drop(type,x,y,side){
+  if(
+    (type==="P"||type==="L")&&
+    ((side==="player"&&y===0)||(side==="bot"&&y===8))
+  )return false;
+
+  if(
+    type==="N"&&
+    ((side==="player"&&y<2)||(side==="bot"&&y>6))
+  )return false;
+
+  if(type==="P"){
+    for(let row=0;row<9;row++){
+      const piece=b[row][x];
+
+      if(
+        piece&&
+        piece.side===side&&
+        piece.type==="P"&&
+        !piece.promoted
+      )return false;
+    }
+  }
+
+  return true;
+}
+
+function king(side){
+  for(let y=0;y<9;y++)
+    for(let x=0;x<9;x++)
+      if(b[y][x]&&b[y][x].side===side&&b[y][x].type==="K")
+        return{x,y};
+
+  return null;
+}
+
+function check(side){
+  const kp=king(side);
+  const enemy=side==="player"?"bot":"player";
+
+  if(!kp)return true;
+
+  for(let y=0;y<9;y++)
+    for(let x=0;x<9;x++){
+      const piece=b[y][x];
+
+      if(piece&&piece.side===enemy&&can(piece,x,y,kp.x,kp.y))
+        return true;
+    }
+
+  return false;
+}
+
+function copyBoard(){
+  return b.map(row=>row.map(piece=>piece?{...piece}:null));
+}
+
+function copyHands(){
+  return{
+    player:{...h.player},
+    bot:{...h.bot}
+  };
+}
+
+function apply(m,x2,y2,askPromotion){
+  if(m.kind==="h"){
+    b[y2][x2]=pc(m.type,m.side);
+    h[m.side][m.type]--;
+    return;
+  }
+
+  const piece=b[m.y][m.x];
+  const captured=b[y2][x2];
+
+  if(captured)h[piece.side][captured.type]++;
+
+  b[y2][x2]=piece;
+  b[m.y][m.x]=null;
+
+  if(
+    !piece.promoted&&
+    ["P","L","N","S","B","R"].includes(piece.type)&&
+    (zone(piece.side,m.y)||zone(piece.side,y2))
+  ){
+    piece.promoted=askPromotion
+      ?confirm("Promote this piece?")
+      :true;
+  }
+
+  if(
+    (piece.type==="P"||piece.type==="L")&&
+    ((piece.side==="player"&&y2===0)||
+     (piece.side==="bot"&&y2===8))
+  )piece.promoted=true;
+
+  if(
+    piece.type==="N"&&
+    ((piece.side==="player"&&y2<2)||
+     (piece.side==="bot"&&y2>6))
+  )piece.promoted=true;
+}
+
+function moves(side){
+  const available=[];
+
+  for(let y=0;y<9;y++)
+    for(let x=0;x<9;x++){
+      const piece=b[y][x];
+
+      if(!piece||piece.side!==side)continue;
+
+      for(let Y=0;Y<9;Y++)
+        for(let X=0;X<9;X++){
+          if(b[Y][X]?.side!==side&&can(piece,x,y,X,Y)){
+            const oldBoard=copyBoard();
+            const oldHands=copyHands();
+
+            apply({kind:"b",x,y,side},X,Y,false);
+
+            const illegal=check(side);
+
+            b=oldBoard;
+            h=oldHands;
+
+            if(!illegal)
+              available.push({kind:"b",x,y,x2:X,y2:Y,side});
+          }
+        }
+    }
+
+  for(const type of order){
+    if(!h[side][type])continue;
+
+    for(let y=0;y<9;y++)
+      for(let x=0;x<9;x++){
+        if(b[y][x]||!drop(type,x,y,side))continue;
+
+        const oldBoard=copyBoard();
+        const oldHands=copyHands();
+
+        apply({kind:"h",type,side},x,y,false);
+
+        const illegal=check(side);
+
+        b=oldBoard;
+        h=oldHands;
+
+        if(!illegal)
+          available.push({kind:"h",type,side,x2:x,y2:y});
+      }
+  }
+
+  return available;
+}
+
+function mate(side){
+  return check(side)&&moves(side).length===0;
+}
+
+function move(m,x,y){
+  const side=m.side||b[m.y][m.x].side;
+
+  if(mode()==="bot"&&side==="bot"&&turn!=="bot")
+    return;
+
+  const oldBoard=copyBoard();
+  const oldHands=copyHands();
+
+  apply(m,x,y,mode()==="local"||side==="player");
+
+  if(check(side)){
+    b=oldBoard;
+    h=oldHands;
+    sel=null;
+    draw();
+    status("Illegal move: your king is still in check.");
+    return;
+  }
+
+  sel=null;
+
+  const enemy=side==="player"?"bot":"player";
+
+  if(!king(enemy)||mate(enemy)){
+    finish(side,mate(enemy)?"Checkmate":"King captured");
+    return;
+  }
+
+  turn=enemy;
+  draw();
+  status();
+
+  if(mode()==="bot"&&turn==="bot")
+    setTimeout(bot,500);
+}
+
+function evaluateBoard(){
+  let score=0;
+
+  for(let y=0;y<9;y++){
+    for(let x=0;x<9;x++){
+      const piece=b[y][x];
+
+      if(!piece)continue;
+
+      let value=pieceValues[piece.type]||0;
+
+      if(piece.promoted)
+        value+=piece.type==="P"?250:200;
+
+      const centerBonus=
+        4-Math.abs(4-x)+
+        4-Math.abs(4-y);
+
+      value+=centerBonus*3;
+
+      if(piece.side==="bot")
+        score+=value;
+      else
+        score-=value;
+    }
+  }
+
+  if(check("player"))score+=150;
+  if(check("bot"))score-=150;
+
+  return score;
+}
+
+function minimax(depth,maximizing){
+  if(depth===0)
+    return evaluateBoard();
+
+  const side=maximizing?"bot":"player";
+  const available=moves(side);
+
+  if(!available.length){
+    if(check(side))
+      return maximizing?-100000:100000;
+
+    return 0;
+  }
+
+  let best=maximizing?-Infinity:Infinity;
+
+  for(const m of available){
+    const oldBoard=copyBoard();
+    const oldHands=copyHands();
+
+    apply(m,m.x2,m.y2,false);
+
+    const score=minimax(depth-1,!maximizing);
+
+    b=oldBoard;
+    h=oldHands;
+
+    if(maximizing)
+      best=Math.max(best,score);
+    else
+      best=Math.min(best,score);
+  }
+
+  return best;
+}
+
+function bestBotMove(depth){
+  const available=moves("bot");
+
+  if(!available.length)return null;
+
+  let bestScore=-Infinity;
+  let bestMoves=[];
+
+  for(const m of available){
+    const oldBoard=copyBoard();
+    const oldHands=copyHands();
+
+    apply(m,m.x2,m.y2,false);
+
+    const score=minimax(depth-1,false);
+
+    b=oldBoard;
+    h=oldHands;
+
+    if(score>bestScore){
+      bestScore=score;
+      bestMoves=[m];
+    }else if(score===bestScore){
+      bestMoves.push(m);
+    }
+  }
+
+  return bestMoves[
+    Math.floor(Math.random()*bestMoves.length)
+  ];
+}
+
+function bot(){
+  const available=moves("bot");
+
+  if(!available.length){
+    finish("player","Checkmate");
+    return;
+  }
+
+  let selected;
+
+  if(difficulty()==="easy"){
+    selected=available[
+      Math.floor(Math.random()*available.length)
+    ];
+  }else if(difficulty()==="medium"){
+    const captures=available.filter(m=>
+      b[m.y2]?.[m.x2]?.side==="player"
+    );
+
+    const choices=captures.length?captures:available;
+
+    selected=choices[
+      Math.floor(Math.random()*choices.length)
+    ];
+  }else if(difficulty()==="hard"){
+    selected=bestBotMove(2);
+  }else if(difficulty()==="expert"){
+    selected=bestBotMove(3);
+  }else{
+    selected=bestBotMove(4);
+  }
+
+  if(!selected){
+    selected=available[
+      Math.floor(Math.random()*available.length)
+    ];
+  }
+
+  move(selected,selected.x2,selected.y2);
+}
+
+function finish(winner,reason){
+  over=true;
+
+  document.getElementById("winner").textContent=
+    mode()==="local"
+      ?winner==="player"
+        ?"Player 1 won!"
+        :"Player 2 won!"
+      :winner==="player"
+        ?"You won!"
+        :"The bot won!";
+
+  document.getElementById("reason").textContent=reason;
+  document.getElementById("modal").classList.remove("hidden");
+
+  draw();
+}
+
+newGame();
+</script>
+
+</body>
+</html>
